@@ -1,3 +1,4 @@
+
 import express, { type Request, Response, NextFunction } from "express";
 import { registerRoutes } from "./routes";
 import { setupVite, serveStatic, log } from "./vite";
@@ -39,26 +40,40 @@ app.use((req, res, next) => {
 
 // Server setup
 (async () => {
-  const viteServer = await registerRoutes(app);
+  try {
+    const viteServer = await registerRoutes(app);
 
-  app.use((err: any, _req: Request, res: Response, _next: NextFunction) => {
-    const status = err.status || err.statusCode || 500;
-    const message = err.message || "Internal Server Error";
+    app.use((err: any, _req: Request, res: Response, _next: NextFunction) => {
+      const status = err.status || err.statusCode || 500;
+      const message = err.message || "Internal Server Error";
 
-    res.status(status).json({ message });
-    throw err;
-  });
+      res.status(status).json({ message });
+      console.error(err);
+    });
 
-  // Set up Vite in development
-  if (app.get("env") === "development") {
-    await setupVite(app, viteServer);
-  } else {
-    serveStatic(app);
+    // Set up Vite in development
+    if (app.get("env") === "development") {
+      await setupVite(app, viteServer);
+    } else {
+      serveStatic(app);
+    }
+
+    // Serve the app on port 5000 at 0.0.0.0
+    const port = parseInt(process.env.PORT ?? "5000", 10);
+    const server = app.listen(port, "0.0.0.0", () => {
+      log(`Server running on http://0.0.0.0:${port}`);
+    });
+
+    // Graceful shutdown
+    process.on('SIGTERM', () => {
+      log('SIGTERM received, shutting down gracefully');
+      server.close(() => {
+        log('Process terminated');
+      });
+    });
+
+  } catch (error) {
+    console.error('Failed to start server:', error);
+    process.exit(1);
   }
-
-  // Serve the app on port 5000 at 0.0.0.0
-  const port = parseInt(process.env.PORT ?? "5000", 10);
-  const server = app.listen(port, "0.0.0.0", () => {
-    log(`Server running on http://0.0.0.0:${port}`);
-  });
 })();
