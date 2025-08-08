@@ -6,6 +6,7 @@ const app = express();
 app.use(express.json());
 app.use(express.urlencoded({ extended: false }));
 
+// Middleware for logging
 app.use((req, res, next) => {
   const start = Date.now();
   const path = req.path;
@@ -36,8 +37,9 @@ app.use((req, res, next) => {
   next();
 });
 
+// Server setup
 (async () => {
-  const server = await registerRoutes(app);
+  const viteServer = await registerRoutes(app);
 
   app.use((err: any, _req: Request, res: Response, _next: NextFunction) => {
     const status = err.status || err.statusCode || 500;
@@ -47,25 +49,16 @@ app.use((req, res, next) => {
     throw err;
   });
 
-  // importantly only setup vite in development and after
-  // setting up all the other routes so the catch-all route
-  // doesn't interfere with the other routes
+  // Set up Vite in development
   if (app.get("env") === "development") {
-    await setupVite(app, server);
+    await setupVite(app, viteServer);
   } else {
     serveStatic(app);
   }
 
-  // ALWAYS serve the app on the port specified in the environment variable PORT
-  // Other ports are firewalled. Default to 5000 if not specified.
-  // this serves both the API and the client.
-  // It is the only port that is not firewalled.
-  const port = parseInt(process.env.PORT || '5000', 10);
-  server.listen({
-    port,
-    host: "0.0.0.0",
-    reusePort: true,
-  }, () => {
-    log(`serving on port ${port}`);
+  // Serve the app on port 5000 at 0.0.0.0
+  const port = parseInt(process.env.PORT ?? "5000", 10);
+  const server = app.listen(port, "0.0.0.0", () => {
+    log(`Server running on http://0.0.0.0:${port}`);
   });
 })();
